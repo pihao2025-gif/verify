@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>人机验证</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 30px 25px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: all 0.3s;
+        }
+        
+        .step-dot.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transform: scale(1.2);
+        }
+        
+        .step-dot.completed {
+            background: #4CAF50;
+        }
+        
+        .icon {
+            font-size: 56px;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        
+        .step {
+            display: none;
+        }
+        
+        .step.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Turnstile 容器 */
+        .turnstile-wrapper {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            min-height: 65px;
+        }
+        
+        /* 滑动拼图验证 */
+        .puzzle-container {
+            position: relative;
+            width: 280px;
+            height: 160px;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+        
+        .puzzle-bg {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            position: relative;
+        }
+        
+        .puzzle-slot {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(0,0,0,0.3);
+            border: 2px dashed #fff;
+            border-radius: 8px;
+            top: 55px;
+        }
+        
+        .puzzle-piece {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #fff, #e0e0e0);
+            border-radius: 8px;
+            top: 55px;
+            left: 10px;
+            cursor: grab;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            user-select: none;
+            transition: box-shadow 0.2s;
+        }
+        
+        .puzzle-piece:active {
+            cursor: grabbing;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+        
+        .slider-track {
+            width: 280px;
+            height: 45px;
+            background: #e8e8e8;
+            border-radius: 25px;
+            margin: 15px auto;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slider-track::before {
+            content: '👉 滑动拼图到正确位置';
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 45px;
+            color: #999;
+            font-size: 13px;
+        }
+        
+        .slider-thumb {
+            position: absolute;
+            width: 50px;
+            height: 41px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 22px;
+            top: 2px;
+            left: 2px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 20px;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);
+            transition: background 0.2s;
+        }
+        
+        .slider-thumb:active {
+            cursor: grabbing;
+        }
+        
+        .slider-thumb.success {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+        }
+        
+        /* 数学题验证 */
+        .math-question {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .math-input {
+            width: 120px;
+            height: 50px;
+            font-size: 24px;
+            text-align: center;
+            border: 3px solid #ddd;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .math-input:focus {
+            border-color: #667eea;
+        }
+        
+        .math-input.error {
+            border-color: #e74c3c;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        .submit-btn {
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* 状态提示 */
+        .status {
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            display: block;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            margin-top: 25px;
+            color: #999;
+            font-size: 11px;
+        }
+        
+        /* 成功动画 */
+        .success-animation {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            animation: successPop 0.5s ease;
+        }
+        
+        .success-animation.show {
+            display: flex;
+        }
+        
+        @keyframes successPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .success-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        
+        .success-text {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 步骤指示器 -->
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot1"></div>
+            <div class="step-dot" id="dot2"></div>
+            <div class="step-dot" id="dot3"></div>
+        </div>
+        
+        <!-- 第一步：Turnstile 验证 -->
+        <div class="step active" id="step1">
+            <div class="icon">🛡️</div>
+            <h1>第 1 步：安全检测</h1>
+            <p class="subtitle">正在进行环境安全检测...</p>
+            <div class="turnstile-wrapper">
+                <div class="cf-turnstile" 
+                     data-sitekey="0x4AAAAAACH4j7seS-GltmvM"
+                     data-callback="onTurnstileSuccess"
+                     data-error-callback="onTurnstileError"
+                     data-theme="light">
+                </div>
+            </div>
+            <div id="status1" class="status"></div>
+        </div>
+        
+        <!-- 第二步：滑动拼图 -->
+        <div class="step" id="step2">
+            <div class="icon">🧩</div>
+            <h1>第 2 步：滑动验证</h1>
+            <p class="subtitle">拖动滑块，将拼图移到正确位置</p>
+            
+            <div class="puzzle-container">
+                <div class="puzzle-bg">
+                    <div class="puzzle-slot" id="puzzleSlot"></div>
+                    <div class="puzzle-piece" id="puzzlePiece">🧩</div>
+                </div>
+            </div>
+            
+            <div class="slider-track" id="sliderTrack">
+                <div class="slider-thumb" id="sliderThumb">→</div>
+            </div>
+            
+            <div id="status2" class="status"></div>
+        </div>
+        
+        <!-- 第三步：数学题 -->
+        <div class="step" id="step3">
+            <div class="icon">🔢</div>
+            <h1>第 3 步：数学验证</h1>
+            <p class="subtitle">请计算下面的结果</p>
+            
+            <div class="math-question" id="mathQuestion"></div>
+            <input type="number" class="math-input" id="mathInput" placeholder="?">
+            <button class="submit-btn" id="mathSubmit">确认提交</button>
+            
+            <div id="status3" class="status"></div>
+        </div>
+        
+        <!-- 成功页面 -->
+        <div class="success-animation" id="successPage">
+            <div class="success-icon">✅</div>
+            <div class="success-text">验证成功！</div>
+            <p class="subtitle" style="margin-top: 15px;">正在返回机器人...</p>
+        </div>
+        
+        <p class="footer">多重验证保护 · 防止恶意机器人</p>
+    </div>
+
+    <script>
+        // Telegram WebApp 初始化
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        
+        const user = tg.initDataUnsafe?.user;
+        const userId = user?.id;
+        
+        let currentStep = 1;
+        let turnstileToken = null;
+        let puzzleCompleted = false;
+        let mathAnswer = 0;
+        
+        // ==================== 步骤管理 ====================
+        function goToStep(step) {
+            currentStep = step;
+            
+            // 更新步骤显示
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step' + step).classList.add('active');
+            
+            // 更新指示器
+            for (let i = 1; i <= 3; i++) {
+                const dot = document.getElementById('dot' + i);
+                dot.classList.remove('active', 'completed');
+                if (i < step) dot.classList.add('completed');
+                if (i === step) dot.classList.add('active');
+            }
+        }
+        
+        function showStatus(step, type, message) {
+            const status = document.getElementById('status' + step);
+            status.className = 'status ' + type;
+            status.innerHTML = message;
+        }
+        
+        // ==================== 第一步：Turnstile ====================
+        function onTurnstileSuccess(token) {
+            turnstileToken = token;
+            showStatus(1, 'success', '✅ 安全检测通过');
+            
+            setTimeout(() => {
+                goToStep(2);
+                initPuzzle();
+            }, 800);
+        }
+        
+        function onTurnstileError(error) {
+            showStatus(1, 'error', '❌ 安全检测失败，请刷新重试');
+        }
+        
+        // ==================== 第二步：滑动拼图 ====================
+        let slotPosition = 0;
+        let isDragging = false;
+        let startX = 0;
+        let thumbLeft = 0;
+        
+        function initPuzzle() {
+            // 随机拼图位置 (100-220)
+            slotPosition = Math.floor(Math.random() * 120) + 100;
+            document.getElementById('puzzleSlot').style.left = slotPosition + 'px';
+            
+            const thumb = document.getElementById('sliderThumb');
+            const track = document.getElementById('sliderTrack');
+            const piece = document.getElementById('puzzlePiece');
+            
+            // 触摸/鼠标事件
+            thumb.addEventListener('mousedown', startDrag);
+            thumb.addEventListener('touchstart', startDrag, { passive: false });
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+        
+        function startDrag(e) {
+            e.preventDefault();
+            isDragging = true;
+            startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            thumbLeft = parseInt(document.getElementById('sliderThumb').style.left) || 2;
+        }
+        
+        function onDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const deltaX = clientX - startX;
+            let newLeft = thumbLeft + deltaX;
+            
+            // 限制范围
+            newLeft = Math.max(2, Math.min(newLeft, 228));
+            
+            const thumb = document.getElementById('sliderThumb');
+            const piece = document.getElementById('puzzlePiece');
+            
+            thumb.style.left = newLeft + 'px';
+            piece.style.left = (10 + newLeft) + 'px';
+        }
+        
+        function endDrag(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const thumb = document.getElementById('sliderThumb');
+            const piece = document.getElementById('puzzlePiece');
+            const currentLeft = parseInt(thumb.style.left) || 2;
+            const pieceLeft = 10 + currentLeft;
+            
+            // 检查是否匹配 (误差 ±15px)
+            if (Math.abs(pieceLeft - slotPosition) <= 15) {
+                // 成功
+                piece.style.left = slotPosition + 'px';
+                thumb.classList.add('success');
+                thumb.innerHTML = '✓';
+                puzzleCompleted = true;
+                
+                showStatus(2, 'success', '✅ 滑动验证通过');
+                
+                setTimeout(() => {
+                    goToStep(3);
+                    initMath();
+                }, 800);
+            } else {
+                // 失败，重置
+                showStatus(2, 'error', '❌ 请对准位置重试');
+                setTimeout(() => {
+                    thumb.style.left = '2px';
+                    piece.style.left = '10px';
+                    document.getElementById('status2').className = 'status';
+                }, 500);
+            }
+        }
+        
+        // ==================== 第三步：数学题 ====================
+        function initMath() {
+            const a = Math.floor(Math.random() * 20) + 10;
+            const b = Math.floor(Math.random() * 10) + 1;
+            const ops = ['+', '-', '×'];
+            const op = ops[Math.floor(Math.random() * 3)];
+            
+            let question = '';
+            switch(op) {
+                case '+':
+                    mathAnswer = a + b;
+                    question = `${a} + ${b} = ?`;
+                    break;
+                case '-':
+                    mathAnswer = a - b;
+                    question = `${a} - ${b} = ?`;
+                    break;
+                case '×':
+                    mathAnswer = a * b;
+                    question = `${a} × ${b} = ?`;
+                    break;
+            }
+            
+            document.getElementById('mathQuestion').textContent = question;
+            document.getElementById('mathInput').value = '';
+            document.getElementById('mathInput').focus();
+        }
+        
+        document.getElementById('mathSubmit').addEventListener('click', checkMath);
+        document.getElementById('mathInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkMath();
+        });
+        
+        function checkMath() {
+            const input = document.getElementById('mathInput');
+            const userAnswer = parseInt(input.value);
+            
+            if (userAnswer === mathAnswer) {
+                showStatus(3, 'loading', '<span class="loading-spinner"></span>验证中...');
+                document.getElementById('mathSubmit').disabled = true;
+                
+                // 全部验证成功
+                setTimeout(completeVerification, 1000);
+            } else {
+                input.classList.add('error');
+                showStatus(3, 'error', '❌ 答案错误，请重试');
+                
+                setTimeout(() => {
+                    input.classList.remove('error');
+                    input.value = '';
+                    input.focus();
+                    document.getElementById('status3').className = 'status';
+                }, 1000);
+            }
+        }
+        
+        // ==================== 完成验证 ====================
+        function completeVerification() {
+            // 隐藏所有步骤
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.querySelector('.step-indicator').style.display = 'none';
+            document.querySelector('.footer').style.display = 'none';
+            
+            // 显示成功页面
+            document.getElementById('successPage').classList.add('show');
+            
+            // 发送验证结果给 Bot
+            tg.sendData(JSON.stringify({
+                verified: true,
+                user_id: userId,
+                turnstile_token: turnstileToken,
+                steps_completed: ['turnstile', 'puzzle', 'math']
+            }));
+            
+            // 关闭 WebApp
+            setTimeout(() => {
+                tg.close();
+            }, 1500);
+        }
+        
+        // 检查是否从 Telegram 打开
+        if (!userId) {
+            document.querySelector('.container').innerHTML = `
+                <div class="icon">⚠️</div>
+                <h1>访问受限</h1>
+                <p class="subtitle">请从 Telegram 机器人中打开此页面</p>
+            `;
+        }
+    </script>
+</body>
+</html>
+
