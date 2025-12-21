@@ -7,15 +7,11 @@
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -24,70 +20,201 @@
         }
         
         .container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 40px 30px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            padding: 30px 25px;
             max-width: 380px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
         }
         
-        .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
         }
+        
+        .step-dot {
+            width: 50px;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            transition: all 0.3s;
+        }
+        
+        .step-dot.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            width: 80px;
+        }
+        
+        .step-dot.completed { background: #4CAF50; }
+        
+        .icon { font-size: 48px; margin-bottom: 12px; }
         
         h1 {
             color: #333;
-            font-size: 24px;
-            margin-bottom: 10px;
+            font-size: 20px;
+            margin-bottom: 6px;
+            font-weight: 600;
         }
         
         .subtitle {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 30px;
+            color: #888;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+        
+        .step { display: none; }
+        .step.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .turnstile-wrapper {
             display: flex;
             justify-content: center;
-            margin-bottom: 20px;
+            margin: 20px 0;
             min-height: 65px;
         }
         
-        .status {
-            padding: 15px 20px;
+        /* 拼图验证 */
+        .puzzle-wrapper {
+            position: relative;
+            width: 300px;
+            height: 180px;
+            margin: 15px auto;
             border-radius: 12px;
-            margin-top: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .puzzle-canvas { width: 100%; height: 100%; display: block; }
+        
+        .puzzle-piece-canvas {
+            position: absolute;
+            top: 0;
+            left: 10px;
+            pointer-events: none;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        .slider-container {
+            width: 300px;
+            margin: 15px auto;
+            position: relative;
+        }
+        
+        .slider-track {
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(to right, #f0f0f0, #e8e8e8);
+            border-radius: 25px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #ddd;
+        }
+        
+        .slider-progress {
+            position: absolute;
+            left: 0; top: 0;
+            height: 100%;
+            width: 0;
+            background: linear-gradient(to right, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+            border-radius: 25px;
+        }
+        
+        .slider-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 50px;
+            color: #999;
+            font-size: 13px;
+            user-select: none;
+            pointer-events: none;
+        }
+        
+        .slider-thumb {
+            position: absolute;
+            width: 54px;
+            height: 46px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 23px;
+            top: 2px;
+            left: 2px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 22px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.1s, box-shadow 0.2s;
+            z-index: 10;
+        }
+        
+        .slider-thumb:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        
+        .slider-thumb:active { cursor: grabbing; transform: scale(0.98); }
+        .slider-thumb.success { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        .slider-thumb.error {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        
+        .attempt-info {
+            font-size: 12px;
+            color: #e74c3c;
+            margin-top: 10px;
+            font-weight: 500;
+        }
+        
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 13px;
+            margin-top: 10px;
+            padding: 5px 15px;
+            border-radius: 15px;
+            transition: background 0.2s;
+        }
+        
+        .refresh-btn:hover { background: rgba(102, 126, 234, 0.1); }
+        
+        .status {
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-top: 15px;
             font-size: 14px;
             display: none;
         }
         
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            display: block;
-        }
-        
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            display: block;
-        }
-        
-        .status.loading {
-            background: #fff3cd;
-            color: #856404;
-            display: block;
-        }
+        .status.success { background: #d4edda; color: #155724; display: block; }
+        .status.error { background: #f8d7da; color: #721c24; display: block; }
+        .status.loading { background: #fff3cd; color: #856404; display: block; }
         
         .loading-spinner {
             display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #856404;
+            width: 14px; height: 14px;
+            border: 2px solid currentColor;
             border-radius: 50%;
             border-top-color: transparent;
             animation: spin 1s linear infinite;
@@ -95,142 +222,429 @@
             vertical-align: middle;
         }
         
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .footer { margin-top: 20px; color: #bbb; font-size: 11px; }
+        
+        .success-animation {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            animation: successPop 0.5s ease;
         }
         
-        .footer {
-            margin-top: 30px;
-            color: #999;
-            font-size: 12px;
+        .success-animation.show { display: flex; }
+        
+        @keyframes successPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
         }
         
-        /* Telegram 暗色主题适配 */
-        @media (prefers-color-scheme: dark) {
-            .container {
-                background: rgba(30, 30, 30, 0.95);
-            }
-            h1 { color: #fff; }
-            .subtitle { color: #aaa; }
-            .footer { color: #666; }
-        }
+        .success-icon { font-size: 72px; margin-bottom: 15px; }
+        .success-text { font-size: 22px; font-weight: bold; color: #4CAF50; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon">🔐</div>
-        <h1>人机验证</h1>
-        <p class="subtitle">请完成下方验证以继续使用</p>
-        
-        <div class="turnstile-wrapper">
-            <!-- Cloudflare Turnstile Widget -->
-            <div class="cf-turnstile" 
-                 data-sitekey="0x4AAAAAACH4j7seS-GltmvM"
-                 data-callback="onVerifySuccess"
-                 data-error-callback="onVerifyError"
-                 data-theme="auto">
-            </div>
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot1"></div>
+            <div class="step-dot" id="dot2"></div>
         </div>
         
-        <div id="status" class="status"></div>
+        <!-- 第一步：Turnstile -->
+        <div class="step active" id="step1">
+            <div class="icon">🛡️</div>
+            <h1>安全环境检测</h1>
+            <p class="subtitle">正在检测您的浏览器环境...</p>
+            <div class="turnstile-wrapper">
+                <div class="cf-turnstile" 
+                     data-sitekey="0x4AAAAAACH4j7seS-GltmvM"
+                     data-callback="onTurnstileSuccess"
+                     data-error-callback="onTurnstileError"
+                     data-theme="light">
+                </div>
+            </div>
+            <div id="status1" class="status"></div>
+        </div>
         
-        <p class="footer">验证由 Cloudflare 提供安全保护</p>
+        <!-- 第二步：图片拼图 -->
+        <div class="step" id="step2">
+            <div class="icon">🧩</div>
+            <h1>滑动完成拼图</h1>
+            <p class="subtitle">拖动滑块，使拼图块对准缺口</p>
+            
+            <div class="puzzle-wrapper">
+                <canvas class="puzzle-canvas" id="puzzleCanvas" width="300" height="180"></canvas>
+                <canvas class="puzzle-piece-canvas" id="pieceCanvas"></canvas>
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-track" id="sliderTrack">
+                    <div class="slider-progress" id="sliderProgress"></div>
+                    <span class="slider-text">➜ 拖动滑块完成拼图</span>
+                    <div class="slider-thumb" id="sliderThumb">⬌</div>
+                </div>
+            </div>
+            
+            <p class="attempt-info" id="attemptInfo"></p>
+            <button class="refresh-btn" id="refreshBtn">🔄 换一张图片</button>
+            
+            <div id="status2" class="status"></div>
+        </div>
+        
+        <!-- 成功页面 -->
+        <div class="success-animation" id="successPage">
+            <div class="success-icon">✅</div>
+            <div class="success-text">验证成功！</div>
+            <p class="subtitle" style="margin-top: 15px; color: #666;">正在返回机器人...</p>
+        </div>
+        
+        <p class="footer">双重验证保护 · 防止恶意机器人</p>
     </div>
 
     <script>
-        // Telegram WebApp 初始化
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
         
-        // 获取用户信息
         const user = tg.initDataUnsafe?.user;
         const userId = user?.id;
-        const initData = tg.initData;
         
-        // 状态显示
-        function showStatus(type, message) {
-            const status = document.getElementById('status');
+        let turnstileToken = null;
+        let puzzleAttempts = 0;
+        const maxAttempts = 5;
+        
+        // 轨迹数据
+        let trajectory = [];
+        let startTime = 0;
+        
+        // 步骤管理
+        function goToStep(step) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step' + step).classList.add('active');
+            
+            document.getElementById('dot1').classList.remove('active', 'completed');
+            document.getElementById('dot2').classList.remove('active', 'completed');
+            
+            if (step === 1) {
+                document.getElementById('dot1').classList.add('active');
+            } else {
+                document.getElementById('dot1').classList.add('completed');
+                document.getElementById('dot2').classList.add('active');
+            }
+        }
+        
+        function showStatus(step, type, message) {
+            const status = document.getElementById('status' + step);
             status.className = 'status ' + type;
             status.innerHTML = message;
         }
         
-        // 验证成功回调
-        function onVerifySuccess(token) {
-            showStatus('loading', '<span class="loading-spinner"></span>验证中...');
+        // 第一步：Turnstile
+        function onTurnstileSuccess(token) {
+            turnstileToken = token;
+            showStatus(1, 'success', '✅ 环境检测通过');
+            setTimeout(() => { goToStep(2); initPuzzle(); }, 800);
+        }
+        
+        function onTurnstileError() {
+            showStatus(1, 'error', '❌ 检测失败，请刷新重试');
+        }
+        
+        // 第二步：图片拼图
+        const images = [
+            'https://picsum.photos/300/180?random=1',
+            'https://picsum.photos/300/180?random=2',
+            'https://picsum.photos/300/180?random=3',
+            'https://picsum.photos/300/180?random=4',
+            'https://picsum.photos/300/180?random=5'
+        ];
+        
+        let slotX = 0, slotY = 0;
+        const pieceSize = 50;
+        const tolerance = 6;
+        
+        function initPuzzle() {
+            puzzleAttempts = 0;
+            updateAttemptInfo();
+            loadNewImage();
+            initSlider();
+        }
+        
+        function loadNewImage() {
+            const canvas = document.getElementById('puzzleCanvas');
+            const ctx = canvas.getContext('2d');
+            const pieceCanvas = document.getElementById('pieceCanvas');
+            const pieceCtx = pieceCanvas.getContext('2d');
             
-            // 发送到后端验证
-            verifyToken(token);
-        }
-        
-        // 验证错误回调
-        function onVerifyError(error) {
-            showStatus('error', '❌ 验证失败，请刷新页面重试');
-            console.error('Turnstile error:', error);
-        }
-        
-        // 发送 token 到后端验证
-        async function verifyToken(token) {
-            try {
-                // 获取验证 API 地址（从 URL 参数或默认值）
-                const urlParams = new URLSearchParams(window.location.search);
-                const apiUrl = urlParams.get('api') || 'https://YOUR_API_ENDPOINT/verify';
+            const imgUrl = images[Math.floor(Math.random() * images.length)] + '&t=' + Date.now();
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 300, 180);
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        token: token,
-                        user_id: userId,
-                        init_data: initData
-                    })
-                });
+                slotX = Math.floor(Math.random() * 100) + 150;
+                slotY = Math.floor(Math.random() * 60) + 60;
                 
-                const result = await response.json();
+                // 绘制缺口
+                ctx.save();
+                drawPuzzleShape(ctx, slotX, slotY, pieceSize);
+                ctx.clip();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(slotX - 10, slotY - 10, pieceSize + 20, pieceSize + 20);
+                ctx.restore();
                 
-                if (result.success) {
-                    showStatus('success', '✅ 验证通过！窗口即将关闭...');
-                    
-                    // 发送数据回 Bot
-                    tg.sendData(JSON.stringify({
-                        verified: true,
-                        user_id: userId
-                    }));
-                    
-                    // 延迟关闭
-                    setTimeout(() => {
-                        tg.close();
-                    }, 1500);
-                } else {
-                    showStatus('error', '❌ ' + (result.message || '验证失败'));
+                // 缺口边框
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                drawPuzzleShape(ctx, slotX, slotY, pieceSize);
+                ctx.stroke();
+                
+                // 拼图块
+                pieceCanvas.width = pieceSize + 20;
+                pieceCanvas.height = pieceSize + 20;
+                pieceCanvas.style.top = (slotY - 10) + 'px';
+                pieceCanvas.style.left = '10px';
+                
+                pieceCtx.save();
+                drawPuzzleShape(pieceCtx, 10, 10, pieceSize);
+                pieceCtx.clip();
+                pieceCtx.drawImage(img, -slotX + 10, -slotY + 10, 300, 180);
+                pieceCtx.restore();
+                
+                pieceCtx.strokeStyle = '#fff';
+                pieceCtx.lineWidth = 3;
+                drawPuzzleShape(pieceCtx, 10, 10, pieceSize);
+                pieceCtx.stroke();
+                
+                resetSlider();
+            };
+            
+            img.onerror = function() {
+                // 备用渐变背景
+                const gradient = ctx.createLinearGradient(0, 0, 300, 180);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(0.5, '#764ba2');
+                gradient.addColorStop(1, '#f093fb');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 300, 180);
+                
+                // 添加一些装饰
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * 300, Math.random() * 180, Math.random() * 30 + 10, 0, Math.PI * 2);
+                    ctx.fill();
                 }
                 
-            } catch (error) {
-                console.error('Verify error:', error);
+                slotX = Math.floor(Math.random() * 100) + 150;
+                slotY = 65;
                 
-                // 如果后端不可用，尝试直接发送成功
-                // （适用于简单场景，生产环境应该有后端验证）
-                showStatus('success', '✅ 验证通过！');
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                drawPuzzleShape(ctx, slotX, slotY, pieceSize);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
                 
-                tg.sendData(JSON.stringify({
-                    verified: true,
-                    user_id: userId,
-                    token: token
-                }));
+                pieceCanvas.width = pieceSize + 20;
+                pieceCanvas.height = pieceSize + 20;
+                pieceCanvas.style.top = (slotY - 10) + 'px';
                 
-                setTimeout(() => {
-                    tg.close();
-                }, 1500);
+                const pg = pieceCtx.createLinearGradient(0, 0, pieceSize, pieceSize);
+                pg.addColorStop(0, '#667eea');
+                pg.addColorStop(1, '#764ba2');
+                pieceCtx.fillStyle = pg;
+                drawPuzzleShape(pieceCtx, 10, 10, pieceSize);
+                pieceCtx.fill();
+                pieceCtx.strokeStyle = '#fff';
+                pieceCtx.lineWidth = 3;
+                pieceCtx.stroke();
+                
+                resetSlider();
+            };
+            
+            img.src = imgUrl;
+        }
+        
+        function drawPuzzleShape(ctx, x, y, size) {
+            const r = size / 5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + size * 0.35, y);
+            ctx.arc(x + size * 0.5, y, r, Math.PI, 0, true);
+            ctx.lineTo(x + size, y);
+            ctx.lineTo(x + size, y + size * 0.35);
+            ctx.arc(x + size, y + size * 0.5, r, -Math.PI/2, Math.PI/2, false);
+            ctx.lineTo(x + size, y + size);
+            ctx.lineTo(x, y + size);
+            ctx.lineTo(x, y);
+            ctx.closePath();
+        }
+        
+        let isDragging = false;
+        let dragStartX = 0;
+        let thumbStartLeft = 0;
+        
+        function initSlider() {
+            const thumb = document.getElementById('sliderThumb');
+            
+            thumb.addEventListener('mousedown', startDrag);
+            thumb.addEventListener('touchstart', startDrag, { passive: false });
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+            
+            document.getElementById('refreshBtn').onclick = () => {
+                loadNewImage();
+            };
+        }
+        
+        function startDrag(e) {
+            e.preventDefault();
+            isDragging = true;
+            dragStartX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            thumbStartLeft = parseInt(document.getElementById('sliderThumb').style.left) || 2;
+            
+            trajectory = [];
+            startTime = Date.now();
+            recordPoint(e);
+            
+            document.getElementById('sliderThumb').classList.remove('error', 'success');
+            document.getElementById('status2').className = 'status';
+        }
+        
+        function onDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const deltaX = clientX - dragStartX;
+            let newLeft = Math.max(2, Math.min(thumbStartLeft + deltaX, 244));
+            
+            document.getElementById('sliderThumb').style.left = newLeft + 'px';
+            document.getElementById('pieceCanvas').style.left = (10 + newLeft) + 'px';
+            document.getElementById('sliderProgress').style.width = (newLeft + 27) + 'px';
+            
+            recordPoint(e);
+        }
+        
+        function recordPoint(e) {
+            const x = e.type.includes('touch') ? 
+                (e.touches ? e.touches[0].clientX : e.changedTouches[0].clientX) : e.clientX;
+            trajectory.push({ x, t: Date.now() - startTime });
+        }
+        
+        function endDrag(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            recordPoint(e);
+            
+            const currentLeft = parseInt(document.getElementById('sliderThumb').style.left) || 2;
+            const pieceX = 10 + currentLeft;
+            
+            // 检查位置
+            if (Math.abs(pieceX - slotX + 10) <= tolerance) {
+                // 检查轨迹
+                if (isHumanTrajectory()) {
+                    onSuccess();
+                } else {
+                    onFail('操作异常，请重试');
+                }
+            } else {
+                onFail('位置不正确');
             }
         }
         
-        // 如果没有用户信息，显示错误
+        function isHumanTrajectory() {
+            if (trajectory.length < 8) return false;
+            
+            const totalTime = trajectory[trajectory.length - 1].t;
+            if (totalTime < 250) return false; // 太快
+            if (totalTime > 15000) return false; // 太慢
+            
+            // 检查速度变化
+            let changes = 0;
+            for (let i = 2; i < trajectory.length; i++) {
+                const dt1 = trajectory[i-1].t - trajectory[i-2].t || 1;
+                const dt2 = trajectory[i].t - trajectory[i-1].t || 1;
+                const v1 = (trajectory[i-1].x - trajectory[i-2].x) / dt1;
+                const v2 = (trajectory[i].x - trajectory[i-1].x) / dt2;
+                if (Math.abs(v2 - v1) > 0.05) changes++;
+            }
+            
+            return changes >= 2;
+        }
+        
+        function onSuccess() {
+            const thumb = document.getElementById('sliderThumb');
+            thumb.classList.add('success');
+            thumb.innerHTML = '✓';
+            
+            showStatus(2, 'loading', '<span class="loading-spinner"></span>验证中...');
+            
+            setTimeout(completeVerification, 1000);
+        }
+        
+        function onFail(reason) {
+            puzzleAttempts++;
+            updateAttemptInfo();
+            
+            document.getElementById('sliderThumb').classList.add('error');
+            
+            if (puzzleAttempts >= maxAttempts) {
+                showStatus(2, 'error', '❌ 验证失败次数过多');
+                setTimeout(() => tg.close(), 2000);
+                return;
+            }
+            
+            showStatus(2, 'error', '❌ ' + reason);
+            setTimeout(resetSlider, 800);
+        }
+        
+        function resetSlider() {
+            const thumb = document.getElementById('sliderThumb');
+            thumb.style.left = '2px';
+            thumb.innerHTML = '⬌';
+            thumb.classList.remove('error', 'success');
+            document.getElementById('pieceCanvas').style.left = '10px';
+            document.getElementById('sliderProgress').style.width = '0px';
+            document.getElementById('status2').className = 'status';
+        }
+        
+        function updateAttemptInfo() {
+            const remaining = maxAttempts - puzzleAttempts;
+            document.getElementById('attemptInfo').textContent = 
+                puzzleAttempts > 0 ? `剩余尝试: ${remaining} 次` : '';
+        }
+        
+        function completeVerification() {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.querySelector('.step-indicator').style.display = 'none';
+            document.querySelector('.footer').style.display = 'none';
+            document.getElementById('successPage').classList.add('show');
+            
+            tg.sendData(JSON.stringify({
+                verified: true,
+                user_id: userId,
+                token: turnstileToken,
+                attempts: puzzleAttempts,
+                trajectory_len: trajectory.length
+            }));
+            
+            setTimeout(() => tg.close(), 1500);
+        }
+        
         if (!userId) {
-            showStatus('error', '❌ 请从 Telegram 机器人中打开此页面');
+            document.querySelector('.container').innerHTML = `
+                <div class="icon">⚠️</div>
+                <h1>访问受限</h1>
+                <p class="subtitle">请从 Telegram 机器人中打开此页面</p>
+            `;
         }
     </script>
 </body>
 </html>
-
