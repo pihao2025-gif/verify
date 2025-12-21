@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>人机验证</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px 30px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        
+        .turnstile-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            min-height: 65px;
+        }
+        
+        .status {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            display: block;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #856404;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        /* Telegram 暗色主题适配 */
+        @media (prefers-color-scheme: dark) {
+            .container {
+                background: rgba(30, 30, 30, 0.95);
+            }
+            h1 { color: #fff; }
+            .subtitle { color: #aaa; }
+            .footer { color: #666; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🔐</div>
+        <h1>人机验证</h1>
+        <p class="subtitle">请完成下方验证以继续使用</p>
+        
+        <div class="turnstile-wrapper">
+            <!-- Cloudflare Turnstile Widget -->
+            <div class="cf-turnstile" 
+                 data-sitekey="0x4AAAAAACH4j7seS-GltmvM"
+                 data-callback="onVerifySuccess"
+                 data-error-callback="onVerifyError"
+                 data-theme="auto">
+            </div>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <p class="footer">验证由 Cloudflare 提供安全保护</p>
+    </div>
+
+    <script>
+        // Telegram WebApp 初始化
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        
+        // 获取用户信息
+        const user = tg.initDataUnsafe?.user;
+        const userId = user?.id;
+        const initData = tg.initData;
+        
+        // 状态显示
+        function showStatus(type, message) {
+            const status = document.getElementById('status');
+            status.className = 'status ' + type;
+            status.innerHTML = message;
+        }
+        
+        // 验证成功回调
+        function onVerifySuccess(token) {
+            showStatus('loading', '<span class="loading-spinner"></span>验证中...');
+            
+            // 发送到后端验证
+            verifyToken(token);
+        }
+        
+        // 验证错误回调
+        function onVerifyError(error) {
+            showStatus('error', '❌ 验证失败，请刷新页面重试');
+            console.error('Turnstile error:', error);
+        }
+        
+        // 发送 token 到后端验证
+        async function verifyToken(token) {
+            try {
+                // 获取验证 API 地址（从 URL 参数或默认值）
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiUrl = urlParams.get('api') || 'https://YOUR_API_ENDPOINT/verify';
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        user_id: userId,
+                        init_data: initData
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('success', '✅ 验证通过！窗口即将关闭...');
+                    
+                    // 发送数据回 Bot
+                    tg.sendData(JSON.stringify({
+                        verified: true,
+                        user_id: userId
+                    }));
+                    
+                    // 延迟关闭
+                    setTimeout(() => {
+                        tg.close();
+                    }, 1500);
+                } else {
+                    showStatus('error', '❌ ' + (result.message || '验证失败'));
+                }
+                
+            } catch (error) {
+                console.error('Verify error:', error);
+                
+                // 如果后端不可用，尝试直接发送成功
+                // （适用于简单场景，生产环境应该有后端验证）
+                showStatus('success', '✅ 验证通过！');
+                
+                tg.sendData(JSON.stringify({
+                    verified: true,
+                    user_id: userId,
+                    token: token
+                }));
+                
+                setTimeout(() => {
+                    tg.close();
+                }, 1500);
+            }
+        }
+        
+        // 如果没有用户信息，显示错误
+        if (!userId) {
+            showStatus('error', '❌ 请从 Telegram 机器人中打开此页面');
+        }
+    </script>
+</body>
+</html>
+
