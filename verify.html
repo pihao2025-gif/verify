@@ -341,7 +341,7 @@
             status.innerHTML = message;
         }
         
-        // 第一步：Turnstile
+        // 第一步：Turnstile（自动跳过，直接进入拼图）
         function onTurnstileSuccess(token) {
             turnstileToken = token;
             showStatus(1, 'success', '✅ 环境检测通过');
@@ -349,8 +349,19 @@
         }
         
         function onTurnstileError() {
-            showStatus(1, 'error', '❌ 检测失败，请刷新重试');
+            // Turnstile 失败时自动跳过，直接进入拼图验证
+            console.log('Turnstile skipped, going to puzzle');
+            setTimeout(() => { goToStep(2); initPuzzle(); }, 500);
         }
+        
+        // 3秒后自动跳过 Turnstile（如果没有加载成功）
+        setTimeout(() => {
+            if (document.getElementById('step1').classList.contains('active')) {
+                console.log('Turnstile timeout, skipping...');
+                goToStep(2);
+                initPuzzle();
+            }
+        }, 3000);
         
         // 第二步：图片拼图 - 使用本地生成的渐变背景（秒加载）
         const colorSchemes = [
