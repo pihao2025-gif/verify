@@ -651,13 +651,14 @@
             setTimeout(() => tg.close(), 1500);
         }
         
+        // 即使没有 userId 也允许验证，Bot 可以通过 message.from_user 获取用户信息
         if (!userId) {
-            document.querySelector('.container').innerHTML = `
-                <div class="icon">⚠️</div>
-                <h1>访问受限</h1>
-                <p class="subtitle">请从 Telegram 机器人中打开此页面</p>
-            `;
+            console.log('Warning: userId not available, but continuing verification');
         }
+        
+        // 立即初始化拼图（跳过 Turnstile，直接进入拼图）
+        goToStep(2);
+        initPuzzle();
     </script>
 </body>
 </html>
